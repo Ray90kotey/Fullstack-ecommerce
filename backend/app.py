@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, abort
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 # Temporary in-memory data store
 products = [
