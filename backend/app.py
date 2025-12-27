@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, abort
+from flask import Flask, jsonify, abort , request
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -38,6 +38,30 @@ def get_product(product_id):
   if product is None:
     abort(404)
   return jsonify(product)
+
+@app.route("/api/products", methods=["POST"])
+def create_product():
+  data = request.get_json()
+  
+  print("Received data:", data)  # Debugging line
+  
+  if not data:
+    return jsonify({"error": "no data provided"}), 400
+  name = data.get("name")
+  price = data.get("price")
+  stock = data.get("stock")
+  
+  if not name or price is None or not stock:
+    return jsonify({"error": "missing fields"}), 400
+  
+  new_product = {
+    "id": len(products) + 1,
+    "name": name,
+    "price": price,
+    "stock": stock
+  }
+  products.append(new_product)
+  return jsonify(new_product), 201
   
 if __name__ == "__main__":
     app.run(debug=True)
