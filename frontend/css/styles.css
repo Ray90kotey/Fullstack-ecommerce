@@ -1,0 +1,17 @@
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  padding: 20px;
+}
+.product {
+  border: 1px solid #999;
+  padding: 10px;
+  margin-bottom: 10px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(128, 128, 128, 0.3);
+  filter: blur(0.5px);
+}
+
+.product::placeholder {
+  color: gray;
+}
