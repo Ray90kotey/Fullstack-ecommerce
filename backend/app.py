@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, abort , request
 from flask_cors import CORS
+from werkzeug.security import generate_password_hash
 
 app = Flask(__name__)
 CORS(app)
@@ -20,6 +21,23 @@ products = [
      "Grade": "B"
      },
 ]
+users = []
+def create_user(email, password):
+  hashed_password = generate_password_hash(password)
+  
+  user = {
+    "id": len(users) + 1,
+    "email": email,
+    "password": hashed_password
+  }
+  
+  users.append(user)
+  return user 
+
+@app.route("/test-hash")
+def test_hash():
+  user = create_user("test@example.com", "password123")
+  return jsonify(user)
 
 @app.route("/")
 def home():
