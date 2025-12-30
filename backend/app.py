@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, abort , request
 from flask_cors import CORS
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 CORS(app)
@@ -24,20 +24,16 @@ products = [
 users = []
 def create_user(email, password):
   hashed_password = generate_password_hash(password)
-  
   user = {
     "id": len(users) + 1,
     "email": email,
     "password": hashed_password
   }
-  
   users.append(user)
-  return user 
+  return user
 
-@app.route("/test-hash")
-def test_hash():
-  user = create_user("test@example.com", "password123")
-  return jsonify(user)
+def get_user_byemail(email):
+  return next((user for user in users if user["email"] == email), None)
 
 @app.route("/")
 def home():
@@ -60,7 +56,6 @@ def get_product(product_id):
 @app.route("/api/products", methods=["POST"])
 def create_product():
   data = request.get_json()
-  
   print("Received data:", data)  # Debugging line
   
   if not data:
@@ -80,6 +75,23 @@ def create_product():
   }
   products.append(new_product)
   return jsonify(new_product), 201
+
+@app.route("/api/register", methods=["POST"])
+def register_user():
+  data = request.get_json()
+  if not data:
+    return jsonify({"error": "no data provided"}), 400
+  
+  email = data.get("email")
+  password = data.get("password")
+  
+  if not email or not password:
+    return jsonify({"error": "missing fields"}), 400
+  if get_user_byemail(email):
+    return jsonify({"error": "User already exists"}), 400
+  
+  user = create_user(email, password)
+  return jsonify({"message": "user registration successful", "id": user["id"], "email": user["email"]}), 201
   
 if __name__ == "__main__":
     app.run(debug=True)
