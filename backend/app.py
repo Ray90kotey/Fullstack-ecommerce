@@ -1,9 +1,13 @@
 from flask import Flask, jsonify, abort , request
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import (JWTManager, create_access_token, jwt_required, get_jwt_identity)
 
 app = Flask(__name__)
 CORS(app)
+
+app.config["JWT_SECRET_KEY"] = "super-secret"  # Change this in a real application
+jwt = JWTManager(app)
 
 # Temporary in-memory data store
 products = [
@@ -32,7 +36,7 @@ def create_user(email, password):
   users.append(user)
   return user
 
-def get_user_byemail(email):
+def get_user_by_email(email):
   return next((user for user in users if user["email"] == email), None)
 
 @app.route("/")
@@ -54,27 +58,32 @@ def get_product(product_id):
   return jsonify(product)
 
 @app.route("/api/products", methods=["POST"])
-def create_product():
-  data = request.get_json()
-  print("Received data:", data)  # Debugging line
-  
-  if not data:
-    return jsonify({"error": "no data provided"}), 400
-  name = data.get("name")
-  price = data.get("price")
-  stock = data.get("stock")
-  
-  if not name or price is None or not stock:
-    return jsonify({"error": "missing fields"}), 400
-  
-  new_product = {
-    "id": len(products) + 1,
-    "name": name,
-    "price": price,
-    "stock": stock
-  }
-  products.append(new_product)
-  return jsonify(new_product), 201
+@jwt_required()
+def add_product():
+    current_user = get_jwt_identity()
+
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    name = data.get("name")
+    price = data.get("price")
+    stock = data.get("stock")
+
+    if not name or price is None or stock is None:
+        return jsonify({"error": "All fields required"}), 400
+
+    product = {
+        "id": len(products) + 1,
+        "name": name,
+        "price": price,
+        "stock": stock,
+        "created_by": current_user
+    }
+
+    products.append(product)
+    return jsonify(product), 201
 
 @app.route("/api/register", methods=["POST"])
 def register_user():
@@ -87,7 +96,7 @@ def register_user():
   
   if not email or not password:
     return jsonify({"error": "missing fields"}), 400
-  if get_user_byemail(email):
+  if get_user_by_email(email):
     return jsonify({"error": "User already exists"}), 400
   
   user = create_user(email, password)
@@ -106,7 +115,7 @@ def login():
     if not email or not password:
         return jsonify({"error": "Email and password are required"}), 400
 
-    user = get_user_byemail(email)
+    user = get_user_by_email(email)
 
     if not user:
         return jsonify({"error": "Invalid email or password"}), 401
@@ -114,8 +123,11 @@ def login():
     if not check_password_hash(user["password"], password):
         return jsonify({"error": "Invalid email or password"}), 401
 
+    access_token = create_access_token(identity=user["email"])
+
     return jsonify({
         "message": "Login successful",
+        "access_token": access_token,
         "user": {
             "id": user["id"],
             "email": user["email"]
