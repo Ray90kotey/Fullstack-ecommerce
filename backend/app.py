@@ -92,6 +92,35 @@ def register_user():
   
   user = create_user(email, password)
   return jsonify({"message": "user registration successful", "id": user["id"], "email": user["email"]}), 201
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"error": "Email and password are required"}), 400
+
+    user = get_user_byemail(email)
+
+    if not user:
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    if not check_password_hash(user["password"], password):
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    return jsonify({
+        "message": "Login successful",
+        "user": {
+            "id": user["id"],
+            "email": user["email"]
+        }
+    }), 200
   
 if __name__ == "__main__":
     app.run(debug=True)
