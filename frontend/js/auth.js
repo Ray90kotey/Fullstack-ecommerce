@@ -1,10 +1,23 @@
+const authWrapper = document.querySelector('.auth-wrapper');
+const loginTrigger = document.querySelector('.login-trigger');
+const registerTrigger = document.querySelector('.register-trigger');
+
+registerTrigger.addEventListener('click', (e) => {
+    e.preventDefault();
+    authWrapper.classList.add('toggled');
+});
+
+loginTrigger.addEventListener('click', (e) => {
+    e.preventDefault();
+    authWrapper.classList.remove('toggled');
+});
 const authMessage = document.getElementById("auth-message");
 
 /* REGISTER */
 document.getElementById("register-form").addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const email = document.getElementById("reg-email").value;
+    const email = document.getElementById("email").value;
     const password = document.getElementById("reg-password").value;
 
     try {
@@ -28,7 +41,7 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
 document.getElementById("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const email = document.getElementById("login-email").value;
+    const email = document.getElementById("email").value;
     const password = document.getElementById("login-password").value;
 
     try {
