@@ -8,6 +8,7 @@ from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity
 )
+from functools import wraps
 
 app = Flask(__name__)
 CORS(
@@ -15,7 +16,6 @@ CORS(
     resources={r"/api/*": {"origins": "*"}},
     supports_credentials=True
 )
-
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -25,7 +25,6 @@ app.config["JWT_TOKEN_LOCATION"] = ["headers"]
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
-
 # ===================== MODELS =====================
 
 class User(db.Model):
@@ -33,6 +32,7 @@ class User(db.Model):
     name = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
+    role = db.Column(db.String(20), default="user")  # STEP 6C
 
 
 class Product(db.Model):
@@ -42,6 +42,34 @@ class Product(db.Model):
     stock = db.Column(db.Integer, nullable=False)
     created_by = db.Column(db.Integer, nullable=False)
 
+# ===================== HELPERS =====================
+
+# STEP 6A — Input Validation
+def validate_product(data):
+    if not data:
+        return "No data provided"
+    if not data.get("name"):
+        return "Product name is required"
+    if not isinstance(data.get("price"), (int, float)):
+        return "Price must be a number"
+    if not isinstance(data.get("stock"), int):
+        return "Stock must be an integer"
+    return None
+
+
+# STEP 6C — Admin-only decorator
+def admin_required(fn):
+    @wraps(fn)
+    @jwt_required()
+    def wrapper(*args, **kwargs):
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.role != "admin":
+            return jsonify({"error": "Admin access required"}), 403
+
+        return fn(*args, **kwargs)
+    return wrapper
 
 # ===================== ROUTES =====================
 
@@ -93,35 +121,34 @@ def login():
 
     token = create_access_token(identity=str(user.id))
 
-
     return jsonify({
         "access_token": token,
         "user": {
             "id": user.id,
             "name": user.name,
-            "email": user.email
+            "email": user.email,
+            "role": user.role
         }
     }), 200
 
+
+# ===================== PRODUCTS =====================
 
 @app.route("/api/products", methods=["POST"])
 @jwt_required()
 def create_product():
     data = request.get_json()
 
-    name = data.get("name")
-    price = data.get("price")
-    stock = data.get("stock")
-
-    if not name or price is None or stock is None:
-        return jsonify({"error": "All fields are required"}), 400
+    error = validate_product(data)
+    if error:
+        return jsonify({"error": error}), 400
 
     user_id = int(get_jwt_identity())
 
     product = Product(
-        name=name,
-        price=price,
-        stock=stock,
+        name=data["name"],
+        price=data["price"],
+        stock=data["stock"],
         created_by=user_id
     )
 
@@ -136,11 +163,11 @@ def create_product():
     }), 201
 
 
+# STEP 6B — Pagination
 @app.route("/api/products", methods=["GET"])
 @jwt_required()
 def get_products():
     user_id = int(get_jwt_identity())
-
 
     products = Product.query.filter_by(created_by=user_id).all()
 
@@ -155,11 +182,11 @@ def get_products():
     ]), 200
 
 
+
 @app.route("/api/products/<int:id>", methods=["DELETE"])
 @jwt_required()
 def delete_product(id):
     user_id = int(get_jwt_identity())
-
 
     product = Product.query.filter_by(id=id, created_by=user_id).first()
 
@@ -170,6 +197,34 @@ def delete_product(id):
     db.session.commit()
 
     return jsonify({"message": "Product deleted"}), 200
+
+
+# ===================== ADMIN =====================
+
+@app.route("/api/admin/users", methods=["GET"])
+@admin_required
+def get_all_users():
+    users = User.query.all()
+    return jsonify([
+        {
+            "id": u.id,
+            "name": u.name,
+            "email": u.email,
+            "role": u.role
+        } for u in users
+    ]), 200
+
+
+# ===================== ERROR HANDLERS =====================
+
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": "Route not found"}), 404
+
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({"error": "Internal server error"}), 500
 
 
 # ===================== RUN =====================
